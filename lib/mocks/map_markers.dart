@@ -39,7 +39,7 @@ final mapMarkers = [
     address: 'Calle 10 # 7-11',
     location: _locations[0],
     gradientColor: [
-      Color.fromARGB(255, 173, 94, 183),
+      const Color.fromARGB(255, 173, 94, 183),
       const Color.fromARGB(255, 75, 53, 120),
     ],
     textColorTitle: Colors.white,
