@@ -1,3 +1,6 @@
+
+// ignore_for_file: library_prefixes
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as latLng;
@@ -11,7 +14,7 @@ class MyLocationMarker extends AnimatedWidget {
   ) : super(key: key, listenable: animation);
 
   final latLng.LatLng myLocation;
-  final markColor;
+  final Color markColor;
 
   @override
   Widget build(BuildContext context) {

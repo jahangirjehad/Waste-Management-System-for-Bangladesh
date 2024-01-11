@@ -2,7 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:maps_app/google_map/widgets/map_item_details.dart';
+import 'package:maps_app/google_map/widgets/back_to_menu.dart';
+import 'package:maps_app/google_map/widgets/button_center_map_on_the_marker.dart';
+import 'package:maps_app/google_map/widgets/list_details.dart';
+import 'package:maps_app/google_map/widgets/page_indicator.dart';
 import 'package:maps_app/helpers/assets_to_bytes.dart';
 import 'package:maps_app/mocks/map_markers.dart';
 
@@ -75,6 +78,13 @@ class _GoogleMapPageState extends State<GoogleMapPage> {
     mapController = controller;
   }
 
+  void onPageChanged(int value) {
+    if (isTapped) return;
+    setState(() {
+      selectedMarker = value;
+    });
+  }
+
   List<Marker> buildMarkers() {
     final markerList = <Marker>[];
     for (int i = 0; i < mapMarkers.length; i++) {
@@ -134,92 +144,29 @@ class _GoogleMapPageState extends State<GoogleMapPage> {
             ),
             markers: markers.toSet(),
           ),
-          Positioned(
-            left: 0,
-            top: 50,
-            child: MaterialButton(
-              onPressed: () => Navigator.pop(context),
-              color: Colors.white,
-              textColor: Colors.black,
-              padding: const EdgeInsets.all(10),
-              shape: const CircleBorder(),
-              child: const Icon(
-                Icons.arrow_back,
-                size: 20,
-              ),
-            ),
-          ),
-          Positioned(
-            right: 0,
-            top: 50,
-            child: MaterialButton(
-              onPressed: () => {
-                mapController.animateCamera(
-                  CameraUpdate.newCameraPosition(CameraPosition(target: markers[selectedMarker].position, zoom: 17))
+          const BackToMenu(),
+          ButtonCenterMapOnTheMarker(
+            onPressed: () {
+              mapController.animateCamera(
+                CameraUpdate.newCameraPosition(CameraPosition(
+                  target: mapMarkers[selectedMarker].location, zoom: 17)
                 )
-              },
-              color: Colors.white,
-              textColor: Colors.black,
-              padding: const EdgeInsets.all(10),
-              shape: const CircleBorder(),
-              child: const Icon(
-                Icons.gps_fixed,
-                size: 20,
-              ),
-            ),
+              );
+            },
           ),
-          Positioned(
-            bottom: 20,
-            child: Container(
-              width: MediaQuery.of(context).size.width,
-              height: 50,
-              color: Colors.white.withOpacity(0.5),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(mapMarkers.length, (index) {
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 500),
-                    width: selectedMarker == index ? 20 : 10,
-                    height: 10,
-                    margin: const EdgeInsets.symmetric(horizontal: 5),
-                    decoration: BoxDecoration(
-                      color: selectedMarker == index ? Colors.black : Colors.grey,
-                      borderRadius: BorderRadius.circular(5)
-                    ),
-                  );
-                }),
-              ),
-            )
+          PageIndicator(
+            selectedMarker: selectedMarker,
+            numberOfPages: mapMarkers.length,
           ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 50,
-            top: MediaQuery.of(context).size.height * 0.65,
-            child: PageView.builder(
-              onPageChanged: (value) {
-                if (isTapped) return;
-                setState(() {
-                  selectedMarker = value;
-                });
-              },
-              controller: _pageController,
-              itemCount: markers.length,
-              itemBuilder: ((context, index) {
-                final item = mapMarkers[index];
-                return MapItemDetails(
-                  mapMarker: item,
-                  onPressedGoTo: () {
-                    mapController.animateCamera(
-                      CameraUpdate.newCameraPosition(CameraPosition(target: item.location, zoom: 20))
-                    );
-                  },
-                  onPressedCall: () {
-                    
-                  },
-                );
-              })
-            ),
+          ListDetails(
+            pageController: _pageController,
+            onPageChanged: (value) => onPageChanged(value),
+            onPressedGoTo: (item) {
+              mapController.animateCamera(
+                CameraUpdate.newCameraPosition(CameraPosition(target: item.location, zoom: 20))
+              );
+            },
+            onPressedCall: () {},
           ),
         ],
       ),
