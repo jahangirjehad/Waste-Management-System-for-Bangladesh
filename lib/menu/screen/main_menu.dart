@@ -10,6 +10,7 @@ class MainMenu extends StatelessWidget {
       color: Colors.white,
       child: SafeArea(
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             GradientButton(
               textButton: 'Go to Map with Flutter_Map',
