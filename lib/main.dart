@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:maps_app/helpers/app_router.dart';
+import 'package:maps_app/Controller/app_router.dart';
 
 void main() {
   runApp(const MyApp());
