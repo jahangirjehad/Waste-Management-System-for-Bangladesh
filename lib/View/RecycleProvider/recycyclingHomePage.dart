@@ -1,12 +1,15 @@
 import 'dart:convert';
 
+import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:maps_app/Model/recyclingCompany.dart';
-import 'package:maps_app/View/Home/mapScreen.dart';
-import 'package:maps_app/View/RecycleProvider/recommendationPage.dart';
 import 'package:maps_app/View/RecycleProvider/recycleCompanyProfilePage.dart';
+import 'package:shimmer/shimmer.dart';
+
+import '../Home/mapScreen.dart';
 
 class RecyclingHomePage extends StatefulWidget {
   const RecyclingHomePage({super.key});
@@ -15,7 +18,8 @@ class RecyclingHomePage extends StatefulWidget {
   _RecyclingHomePageState createState() => _RecyclingHomePageState();
 }
 
-class _RecyclingHomePageState extends State<RecyclingHomePage> {
+class _RecyclingHomePageState extends State<RecyclingHomePage>
+    with SingleTickerProviderStateMixin {
   List<RecyclingCompany> companies = [];
   List<RecyclingCompany> filteredCompanies = [];
   List<String> searchSuggestions = [];
@@ -23,6 +27,10 @@ class _RecyclingHomePageState extends State<RecyclingHomePage> {
   String? selectedCategory;
   double maxDistance = 100.0;
   Position? currentPosition;
+  bool isLoading = true;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+
   final List<String> categories = [
     'paper',
     'metal',
@@ -35,38 +43,60 @@ class _RecyclingHomePageState extends State<RecyclingHomePage> {
   @override
   void initState() {
     super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+    _animationController.forward();
     fetchData();
     getCurrentLocation();
   }
 
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
   Future<void> fetchData() async {
-    final response = await http.get(Uri.parse(
-        'https://raw.githubusercontent.com/jahangirjehad/JSON-FIle/master/recyclingCompany'));
-    if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body);
-      setState(() {
-        companies =
-            data.map((item) => RecyclingCompany.fromJson(item)).toList();
-        filteredCompanies = companies;
-      });
-    } else {
-      throw Exception('Failed to load data');
+    setState(() => isLoading = true);
+    try {
+      final response = await http.get(Uri.parse(
+          'https://raw.githubusercontent.com/jahangirjehad/JSON-FIle/master/recyclingCompany'));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        setState(() {
+          companies =
+              data.map((item) => RecyclingCompany.fromJson(item)).toList();
+          filteredCompanies = companies;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() => isLoading = false);
+      _showErrorSnackBar('Failed to load data. Please try again.');
     }
   }
 
-  Future<void> getCurrentLocation() async {
-    currentPosition = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high);
-    setState(() {
-      filterCompanies();
-    });
-  }
-
-  double getDistance(RecyclingCompany company) {
-    if (currentPosition == null) return double.infinity;
-    return Geolocator.distanceBetween(currentPosition!.latitude,
-            currentPosition!.longitude, company.lat, company.long) /
-        1000; // Convert to km
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.red,
+        action: SnackBarAction(
+          label: 'Retry',
+          textColor: Colors.white,
+          onPressed: fetchData,
+        ),
+      ),
+    );
   }
 
   void filterCompanies() {
@@ -88,45 +118,83 @@ class _RecyclingHomePageState extends State<RecyclingHomePage> {
     });
   }
 
-  void updateSearchSuggestions(String query) {
-    searchSuggestions = companies
-        .where((company) =>
-            company.name.toLowerCase().contains(query.toLowerCase()))
-        .map((company) => company.name)
-        .toList();
-    searchSuggestions =
-        searchSuggestions.take(5).toList(); // Limit to 5 suggestions
+  Future<void> getCurrentLocation() async {
+    currentPosition = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
+    setState(() {
+      filterCompanies();
+    });
+  }
+
+  double getDistance(RecyclingCompany company) {
+    if (currentPosition == null) return double.infinity;
+    return Geolocator.distanceBetween(currentPosition!.latitude,
+            currentPosition!.longitude, company.lat, company.long) /
+        1000; // Convert to km
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Recycling Partners'),
-        backgroundColor: Theme.of(context).primaryColor,
-        actions: [
-          IconButton(icon: Icon(Icons.refresh), onPressed: fetchData),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: fetchData,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSearchBar(),
-              SizedBox(height: 16),
-              _buildCategoryChips(),
-              SizedBox(height: 16),
-              _buildDistanceSlider(),
-              SizedBox(height: 16),
-              _buildActionButtons(),
-              SizedBox(height: 16),
-              Expanded(
-                child: _buildCompanyList(),
+      body: SafeArea(
+        child: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) => [
+            SliverAppBar(
+              expandedHeight: 200,
+              floating: true,
+              pinned: true,
+              elevation: 0,
+              flexibleSpace: FlexibleSpaceBar(
+                title: Text(
+                  'Recycling Partners',
+                  style: TextStyle(
+                    color: innerBoxIsScrolled ? Colors.black : Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                background: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Theme.of(context).primaryColor,
+                        Theme.of(context).primaryColor.withOpacity(0.8),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ],
+            ),
+          ],
+          body: RefreshIndicator(
+            onRefresh: fetchData,
+            child: AnimatedBuilder(
+              animation: _fadeAnimation,
+              builder: (context, child) => Opacity(
+                opacity: _fadeAnimation.value,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Column(
+                    children: [
+                      _buildSearchBar(),
+                      SizedBox(height: 16),
+                      _buildCategoryChips(),
+                      SizedBox(height: 16),
+                      _buildDistanceSlider(),
+                      SizedBox(height: 16),
+                      _buildActionButtons(),
+                      SizedBox(height: 16),
+                      Expanded(
+                        child: isLoading
+                            ? _buildLoadingGrid()
+                            : _buildCompanyGrid(),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -134,44 +202,207 @@ class _RecyclingHomePageState extends State<RecyclingHomePage> {
   }
 
   Widget _buildSearchBar() {
-    return TextField(
-      decoration: InputDecoration(
-        hintText: 'Search recycling partners',
-        prefixIcon: Icon(Icons.search),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(30),
+    return Hero(
+      tag: 'searchBar',
+      child: Material(
+        elevation: 5,
+        borderRadius: BorderRadius.circular(30),
+        child: TextField(
+          decoration: InputDecoration(
+            hintText: 'Search recycling partners',
+            prefixIcon:
+                Icon(Icons.search, color: Theme.of(context).primaryColor),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(30),
+              borderSide: BorderSide.none,
+            ),
+            filled: true,
+            fillColor: Colors.white,
+          ),
+          onChanged: (value) {
+            setState(() {
+              searchQuery = value;
+              filterCompanies();
+            });
+          },
         ),
-        filled: true,
-        fillColor: Colors.grey[200],
       ),
-      onChanged: (value) {
-        setState(() {
-          searchQuery = value;
-          filterCompanies();
-        });
-      },
     );
   }
 
   Widget _buildCategoryChips() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: categories.map((category) {
-          return Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: ChoiceChip(
-              label: Text(category),
-              selected: selectedCategory == category,
-              onSelected: (selected) {
-                setState(() {
-                  selectedCategory = selected ? category : null;
-                  filterCompanies();
-                });
-              },
+    return AnimationLimiter(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: AnimationConfiguration.toStaggeredList(
+            duration: const Duration(milliseconds: 375),
+            childAnimationBuilder: (widget) => SlideAnimation(
+              horizontalOffset: 50.0,
+              child: FadeInAnimation(child: widget),
+            ),
+            children: categories.map((category) {
+              return Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: FilterChip(
+                  label: Text(category.toUpperCase()),
+                  selected: selectedCategory == category,
+                  onSelected: (selected) {
+                    setState(() {
+                      selectedCategory = selected ? category : null;
+                      filterCompanies();
+                    });
+                  },
+                  selectedColor:
+                      Theme.of(context).primaryColor.withOpacity(0.2),
+                  checkmarkColor: Theme.of(context).primaryColor,
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingGrid() {
+    return GridView.builder(
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.75,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+      ),
+      itemCount: 6,
+      itemBuilder: (context, index) {
+        return Shimmer.fromColors(
+          baseColor: Colors.grey[300]!,
+          highlightColor: Colors.grey[100]!,
+          child: Card(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCompanyGrid() {
+    if (filteredCompanies.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'No companies found.\nTry adjusting your filters.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return AnimationLimiter(
+      child: GridView.builder(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 0.75,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+        ),
+        itemCount: filteredCompanies.length,
+        itemBuilder: (context, index) {
+          return AnimationConfiguration.staggeredGrid(
+            position: index,
+            duration: const Duration(milliseconds: 375),
+            columnCount: 2,
+            child: ScaleAnimation(
+              child: FadeInAnimation(
+                child: _buildCompanyCard(filteredCompanies[index]),
+              ),
             ),
           );
-        }).toList(),
+        },
+      ),
+    );
+  }
+
+  Widget _buildCompanyCard(RecyclingCompany company) {
+    return OpenContainer(
+      transitionDuration: Duration(milliseconds: 500),
+      openBuilder: (context, _) => RecycleCompanyProfilePage(company: company),
+      closedShape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      closedBuilder: (context, openContainer) => Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Hero(
+              tag: 'company_image_${company.image}',
+              child: ClipRRect(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                child: Image.network(
+                  company.image,
+                  height: 100,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      height: 120,
+                      color: Colors.grey[300],
+                      child: Icon(Icons.error, color: Colors.grey[600]),
+                    );
+                  },
+                ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      company.name,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      company.address,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Spacer(),
+                    Row(
+                      children: [
+                        ...List.generate(
+                          company.rating.round(),
+                          (index) =>
+                              Icon(Icons.star, color: Colors.amber, size: 16),
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          company.rating.toStringAsFixed(1),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -228,109 +459,9 @@ class _RecyclingHomePageState extends State<RecyclingHomePage> {
         ElevatedButton.icon(
           icon: Icon(Icons.recommend),
           label: Text('Recommendations'),
-          onPressed: () {
-            Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const Recommendationpage()));
-          },
+          onPressed: () {},
         ),
       ],
-    );
-  }
-
-  Widget _buildCompanyList() {
-    if (filteredCompanies.isEmpty) {
-      return Center(
-          child: Text('No companies found. Try adjusting your filters.'));
-    }
-    return GridView.builder(
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.75,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-      ),
-      itemCount: filteredCompanies.length,
-      itemBuilder: (context, index) {
-        final company = filteredCompanies[index];
-        return Card(
-          elevation: 4,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: InkWell(
-            onTap: () {
-              Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) =>
-                          RecycleCompanyProfilePage(company: company)));
-            },
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-                  child: Image.network(
-                    company.image,
-                    height: 120,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        height: 120,
-                        color: Colors.grey[300],
-                        child: Icon(Icons.error, color: Colors.grey[600]),
-                      );
-                    },
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          company.name,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleSmall
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          company.address,
-                          style: Theme.of(context).textTheme.titleSmall,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Spacer(),
-                        Row(
-                          children: [
-                            ...List.generate(
-                              company.rating.round(),
-                              (index) => Icon(Icons.star,
-                                  color: Colors.amber, size: 16),
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              company.rating.toStringAsFixed(1),
-                              style: Theme.of(context).textTheme.titleSmall,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }

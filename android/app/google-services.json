@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "783852131840",
+    "project_id": "waste-management-59417",
+    "storage_bucket": "waste-management-59417.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:783852131840:android:b2a678b79d09b11ce46ae5",
+        "android_client_info": {
+          "package_name": "com.example.maps_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAlDCAbTVg3wnPj-Gwpx4LHbX33hz63wHY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

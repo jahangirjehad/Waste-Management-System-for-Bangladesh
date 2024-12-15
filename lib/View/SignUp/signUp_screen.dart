@@ -1,10 +1,16 @@
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Firebase Auth
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:maps_app/utils/my_colors.dart';
+
+import '../../Controller/AuthController.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
@@ -26,6 +32,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController orgPhoneController = TextEditingController();
   final TextEditingController latController = TextEditingController();
   final TextEditingController longController = TextEditingController();
+
+  // Firebase Auth instance
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final AuthController _authController = AuthController();
 
   void _changeProfileImage() async {
     final picker = ImagePicker();
@@ -250,12 +260,125 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  void _submitForm() {
+  void _submitForm() async {
     if (_formKey.currentState!.validate()) {
-      // Process form data
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Processing Registration')),
-      );
+      try {
+        UserCredential userCredential;
+        String userId;
+        String? profileImageUrl;
+
+        // Upload profile image if selected
+        if (_profileImage != null) {
+          try {
+            profileImageUrl = await _uploadProfileImage(_profileImage!);
+            if (profileImageUrl == null) {
+              throw Exception('Failed to upload profile image.');
+            }
+            print('Profile image uploaded successfully. URL: $profileImageUrl');
+          } catch (e) {
+            print('Error uploading profile image: $e');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                  content: Text(
+                      'Failed to upload profile image. Please try again.')),
+            );
+            return; // Exit the function if image upload fails
+          }
+        } else {
+          print('No profile image selected');
+        }
+
+        if (isCreateUser) {
+          // Create user account
+          userCredential = await _auth.createUserWithEmailAndPassword(
+            email: emailController.text,
+            password: passwordController.text,
+          );
+          userId = userCredential.user!.uid;
+
+          // Save additional user information to Firestore
+          await FirebaseFirestore.instance.collection('users').doc(userId).set({
+            'name': nameController.text,
+            'email': emailController.text,
+            'userType': 'individual',
+            'createdAt': FieldValue.serverTimestamp(),
+            'profileImageUrl':
+                profileImageUrl ?? '', // Store image URL or empty string
+          });
+          print('User data saved to Firestore. User ID: $userId');
+        } else {
+          // Create organization account
+          userCredential = await _auth.createUserWithEmailAndPassword(
+            email: orgEmailController.text,
+            password: passwordController.text,
+          );
+          userId = userCredential.user!.uid;
+
+          // Save organization information to Firestore
+          await FirebaseFirestore.instance
+              .collection('organizations')
+              .doc(userId)
+              .set({
+            'name': orgNameController.text,
+            'email': orgEmailController.text,
+            'phone': orgPhoneController.text,
+            'location': GeoPoint(
+              double.parse(latController.text),
+              double.parse(longController.text),
+            ),
+            'userType': 'organization',
+            'createdAt': FieldValue.serverTimestamp(),
+            'profileImageUrl': profileImageUrl ?? '',
+          });
+          print(
+              'Organization data saved to Firestore. Organization ID: $userId');
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Registration successful!')),
+        );
+
+        // Navigate to the next screen (e.g., home screen)
+        // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomeScreen()));
+      } catch (e) {
+        print('Error during registration: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  Future<String?> _uploadProfileImage(File imageFile) async {
+    try {
+      // Read the image file into bytes
+      Uint8List imageBytes = await imageFile.readAsBytes();
+
+      String fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      Reference storageReference =
+          FirebaseStorage.instance.ref().child('profile_images/$fileName');
+
+      // Set metadata to indicate it's an image
+      SettableMetadata metadata = SettableMetadata(contentType: 'image/jpeg');
+
+      // Upload the image as bytes instead of a file
+      UploadTask uploadTask = storageReference.putData(imageBytes, metadata);
+
+      // Wait for the upload to complete
+      TaskSnapshot taskSnapshot = await uploadTask;
+
+      if (taskSnapshot.state == TaskState.success) {
+        // Get the download URL
+        String downloadUrl = await taskSnapshot.ref.getDownloadURL();
+        print('Image uploaded successfully. Download URL: $downloadUrl');
+        return downloadUrl;
+      } else {
+        print('Upload task failed. State: ${taskSnapshot.state}');
+        return null;
+      }
+    } catch (e) {
+      print('Error in _uploadProfileImage: $e');
+      return null;
     }
   }
 }
@@ -352,7 +475,7 @@ class _MapScreenState extends State<MapScreen> {
                       },
                       style: ButtonStyle(
                         backgroundColor:
-                            MaterialStateProperty.all<Color>(Colors.green),
+                            WidgetStateProperty.all<Color>(Colors.green),
                       ),
                       child: Text(
                         'Picked',

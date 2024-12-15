@@ -57,9 +57,9 @@ class RecycleCompanyProfilePage extends StatelessWidget {
 
   Widget _buildCompanyDetails(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.all(1),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(25),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

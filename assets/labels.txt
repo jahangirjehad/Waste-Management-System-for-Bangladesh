@@ -1,6 +1,10 @@
-cardboard
-glass
-metal
-paper
-plastic
-trash
+0 paper_cups
+1 aluminum_food_cans
+2 aluminum_soda_cans
+3 cardboard_boxes
+4 cardboard_packaging
+5 clothing
+6 coffee_grounds
+7 disposable_plastic_cutlery
+8 plastic_water_bottles
+9 newspaper

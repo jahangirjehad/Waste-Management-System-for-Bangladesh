@@ -18,8 +18,10 @@ class OrganizationHomepage extends StatelessWidget {
     return Scaffold(
       backgroundColor: MyColors.backgroundColor,
       appBar: AppBar(
-        title:
-            const Text('Organizations', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Organizations',
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: MyColors.primaryColor,
         elevation: 0,
       ),
@@ -54,71 +56,87 @@ class OrganizationHomepage extends StatelessWidget {
 
   Widget _buildOrganizationList(List<Map<String, dynamic>> organizations) {
     return SizedBox(
-      height: 200,
+      height: 220,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: organizations.length,
         itemBuilder: (context, index) {
-          return _buildOrganizationCard(organizations[index]);
+          return _buildOrganizationCard(context, organizations[index]);
         },
       ),
     );
   }
 
-  Widget _buildOrganizationCard(Map<String, dynamic> organization) {
-    return Container(
-      width: 160,
-      margin: const EdgeInsets.only(left: 16, bottom: 16),
-      decoration: BoxDecoration(
-        color: MyColors.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: Offset(0, 4),
+  Widget _buildOrganizationCard(
+      BuildContext context, Map<String, dynamic> organization) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => OrganizationDetails(organization),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-            child: Image.network(
-              organization['image'],
-              height: 100,
-              width: double.infinity,
-              fit: BoxFit.cover,
+        );
+      },
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        width: 180,
+        margin: const EdgeInsets.only(left: 16, bottom: 16),
+        decoration: BoxDecoration(
+          color: MyColors.cardColor,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: Offset(0, 4),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  organization['name'],
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: MyColors.textColor,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Hero(
+              tag: organization['name'],
+              child: ClipRRect(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                child: Image.network(
+                  organization['image'],
+                  height: 120,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
                 ),
-                SizedBox(height: 4),
-                Text(
-                  '${organization['members']} members',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: MyColors.secondaryTextColor,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    organization['name'],
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: MyColors.textColor,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${organization['members']} members',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: MyColors.secondaryTextColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -135,10 +153,10 @@ class OrganizationHomepage extends StatelessWidget {
                   builder: (context) => const OrganizationsPage()),
             );
           },
-          child: Text('See More Organizations'),
+          child: const Text('See More Organizations'),
           style: ElevatedButton.styleFrom(
             backgroundColor: MyColors.accentColor,
-            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
@@ -204,4 +222,56 @@ class OrganizationHomepage extends StatelessWidget {
       'image': 'https://via.placeholder.com/100?text=Renewable'
     },
   ];
+}
+
+class OrganizationDetails extends StatelessWidget {
+  final Map<String, dynamic> organization;
+
+  const OrganizationDetails(this.organization, {Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          organization['name'],
+          style: const TextStyle(color: Colors.white),
+        ),
+        backgroundColor: MyColors.primaryColor,
+      ),
+      body: Column(
+        children: [
+          Hero(
+            tag: organization['name'],
+            child: Image.network(
+              organization['image'],
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: 250,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  organization['name'],
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${organization['members']} members',
+                  style: TextStyle(color: MyColors.secondaryTextColor),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
